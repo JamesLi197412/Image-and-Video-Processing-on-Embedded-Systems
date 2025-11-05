@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "baboon-image": "^2.1.0"
+    "baboon-image": "^2.1.0",
+    "pillow": "^0.0.9"
   }
 }
