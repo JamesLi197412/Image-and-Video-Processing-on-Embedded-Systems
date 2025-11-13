@@ -4,12 +4,10 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
-import npimage
 
 
-# Exercise 4.2
-mandrill_rgb = np.array(Image.open('mandrill_rgb.png'), dtype = np.uint8)
-#mandrill_rgb = npimage.imread("mandrill.png")
+# Exercise 4.3 Preprocessing
+mandrill_rgb = np.array(Image.open('mandrill.png'), dtype = np.uint8)
 
 str_img_size = str(mandrill_rgb.size)
 str_img_height = str(mandrill_rgb.shape[0])
@@ -24,7 +22,7 @@ mandrill_blue_ch = mandrill_rgb.copy()
 mandrill_red_ch[:,:,1:3] = 0
 mandrill_green_ch[:,:,0] = 0
 mandrill_green_ch[:,:,2] = 0
-mandrill_blue_ch[:,:,2] = 0
+mandrill_blue_ch[:,:,:2] = 0
 
 plt.subplot(2,3,1)
 plt.imshow(mandrill_rgb)
@@ -63,4 +61,4 @@ plt.title("Blue Channel")
 plt.axis('off')
 
 plt.tight_layout()
-plt.savefig (" mandrill_channels.png ")
+plt.savefig ("mandrill_channels.png")

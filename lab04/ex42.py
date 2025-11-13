@@ -1,8 +1,9 @@
 from PIL import Image
 from PIL.Image import Image as PILImage
-
+from typing import List
 
 #exercise 4.2
+# The conclusion: You are strongly not suggested to work on pixel by pixel, it will take too longer time.
 def convert_to_grayscale_simple(img: PILImage) -> PILImage:
     width, height = img.size
     gray_img = Image.new('L', (width, height))
@@ -38,9 +39,12 @@ def histogram(img_gray: PILImage) -> List[int]:
 
     return pixel_values
 
-img_0 = Image.open("image_0.png")
-gray_0_simple = convert_to_grayscale_simple(img_0)
-gray_0_weighted = convert_to_grayscale_weighted(img_0)
+def image_process(filename:str):
+    img = Image.open( filename +".png")
+    gray_simple = convert_to_grayscale_simple(img)
+    gray_weighted = convert_to_grayscale_weighted(img)
 
-gray_0_simple.save("gray_0_simple.png")
-gray_0_weighted.save("gray_0_weighted.png")
+    gray_simple.save(f"{filename}_simple.png")
+    gray_weighted.save(f"{filename}_weighted.png")
+
+image_process("mandrill")

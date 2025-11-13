@@ -37,19 +37,34 @@ def main():
     x,y = normal_cdf()
 
     # Calculate histograms for visualization
-    hist_original, _ = np.histogram(mandrill_1.flatten(), bins=256, range=(0, 255))
-    hist_equalized, _ = np.histogram(mandrill_2.flatten(), bins=256, range=(0, 255))
-
-    # Normalize histograms to probabilities
-    pdf_original = hist_original / mandrill_1.size
-    pdf_equalized = hist_equalized / mandrill_2.size
-
-    # Calculate CDF of equalized image
-    cdf_equalized = np.cumsum(pdf_equalized)
-
     plt.figure(figsize=(10,8))
     plt.subplot(231), plt.title("Before"), plt.axis('off')
     plt.imshow(mandrill_1, cmap='gray', vmin= 0, vmax = 255)
 
-    plt.subplot(232), plt.title("After"), plt.axis('off')
-    plt.imshow()
+    plt.subplot(232)
+    plt.plot(x,y)
+    plt.title("Normal CDF")
+    plt.xlabel("x")
+    plt.ylabel("y")
+
+    plt.subplot(233), plt.title("After"), plt.axis('off')
+    plt.imshow(mandrill_2, cmap='gray', vmin= 0, vmax = 255)
+    plt.axis("off")
+
+    # Histogram Original
+    plt.subplot(2,3,4)
+    plt.bar(np.arange(256),cdf)
+    plt.title("Histogram Original")
+    plt.xlim(0,255)
+
+
+    plt.subplot(2,3,5)
+
+    plt.subplot(2,3,6)
+    plt.bar(np.arange(256),cdf)
+    plt.title("Histogram CDF-Normalized")
+    plt.xlim(0,255)
+
+    plt.tight_layout()
+    plt.savefig(fig_path, dpi = 150)
+    plt.close()
