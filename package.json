@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "baboon-image": "^2.1.0",
+    "numpy": "^0.0.1",
     "pillow": "^0.0.9"
   }
 }
