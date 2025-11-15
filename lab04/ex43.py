@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 import time
-
+from typing import List
 
 def load_image_to_array(file_name:str) -> np.ndarray:
     try:
@@ -37,10 +37,17 @@ def convert_rgb_weighted_1(img_rgb:np.ndarray) -> np.ndarray:
     return luminance.astype(np.uint8)
 
 def convert_rgb_weighted_2(img_rgb:np.ndarray) -> np.ndarray:
-    weights = np.array([0.229, 0.224, 0.225])
+    weights = np.array([0.229, 0.587, 0.114])
     luminance = np.dot(img_rgb, weights)
     return luminance.astype(np.uint8)
 
+# User - defined hist function
+def hist_self(img_gray: np.ndarray, bins: int = 256) -> List[int]:
+    hist = [0] * bins
+    for pixel in img_gray.flatten():
+        hist[pixel] += 1
+
+    return hist
 
 def plot_histogram(img_gray: np.ndarray, plot_path: str):
     """
@@ -59,15 +66,17 @@ def plot_histogram(img_gray: np.ndarray, plot_path: str):
 
     # Manual histogram implementation
     pixel_values = img_gray.flatten()
-    ax1.hist(pixel_values, bins=256, range=(0, 255), color='gray', edgecolor='black', alpha=0.7)
-    ax1.set_title('Custom Histogram Implementation')
+    #ax1.hist(pixel_values, bins=256, range=(0, 255), color='gray', edgecolor='black', alpha=0.7)
+    counts = hist_self(img_gray)
+    ax1.plot(range(256), counts, color ='gray', linewidth=2)
+    ax1.set_title('Histogramm 1')
     ax1.set_xlabel('Intensity Value')
     ax1.set_ylabel('Frequency')
     ax1.grid(True, alpha=0.3)
 
     # Matplotlib's hist() function
     ax2.hist(pixel_values, bins=256, range=(0, 255), color='blue', edgecolor='black', alpha=0.7)
-    ax2.set_title('Matplotlib hist() Function')
+    ax2.set_title('Histogram 2')
     ax2.set_xlabel('Intensity Value')
     ax2.set_ylabel('Frequency')
     ax2.grid(True, alpha=0.3)
@@ -77,11 +86,11 @@ def plot_histogram(img_gray: np.ndarray, plot_path: str):
     print(f"Saved histogram to {plot_path}")
     plt.close()
 
-def comparision(img_0, img_50, img_100, func):
-    start = time.time()
-    gray_0_equal = convert_rgb_equal(img_0)
-    gray_50_equal = convert_rgb_equal(img_50)
-    gray_100_equal = convert_rgb_equal(img_100)
-    duration = time.time() - start
-    return duration
+def comparision(filename:str):
+    mandrill = np.array(Image.open(filename), dtype = np.uint8)
+    mandrill_gray = convert_rgb_weighted_2(mandrill)
+    plot_histogram(mandrill_gray, f"Histogram for mandrill.png")
 
+
+
+comparision("mandrill.png")
