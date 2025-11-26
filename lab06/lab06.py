@@ -28,13 +28,9 @@ def add_noise(img: np.ndarray, dev: Union[int, float]) -> np.ndarray:
 
 def compute_derivatives( img: np.ndarray,sigma: Union[int, float] = 3) -> Tuple[np.ndarray, np.ndarray]:
     assert isinstance(img, np.ndarray) and isinstance(sigma, (int, float))
+    fm = gaussian_filter(img, sigma=(sigma, sigma), order=(0, 1))
 
-    # Gaussian smoothing before gradient
-    sm = gaussian_filter(img, sigma=sigma)
-
-    # Sobel derivatives (consistent with Harris)
-    fm = cv2.Sobel(sm, cv2.CV_32F, 1, 0, ksize=3)
-    fn = cv2.Sobel(sm, cv2.CV_32F, 0, 1, ksize=3)
+    fn = gaussian_filter(img, sigma=(sigma, sigma), order=(1, 0))
 
     return fm, fn
 
@@ -69,9 +65,9 @@ def window_img(
 
     return w_fm, w_fn, img_with_frame
 
-def ex61(sigma):
+def ex61(dev, sigma):
     img = create_test_img(800,800)
-    n_img = add_noise(img, 30)
+    n_img = add_noise(img, dev)
 
     fm, fn = compute_derivatives(img, sigma)
     fm_n, fn_n = compute_derivatives(n_img, sigma)
@@ -88,9 +84,9 @@ def ex61(sigma):
 
     # noisy image
     n_img_uint8 = np.clip(n_img, 0, 255).astype(np.float32)
-    w_fm4, w_fn4, img4 = window_img(flat, n_img_uint8, fm_n, fn_n)
-    w_fm5, w_fn5, img5 = window_img(edge, n_img_uint8, fm_n, fn_n)
-    w_fm6, w_fn6, img6 = window_img(corner, n_img_uint8, fm_n, fn_n)
+    w_fm4, w_fn4, img4 = window_img(flat, img_uint8, fm_n, fn_n)
+    w_fm5, w_fn5, img5 = window_img(edge, img_uint8, fm_n, fn_n)
+    w_fm6, w_fn6, img6 = window_img(corner, img_uint8, fm_n, fn_n)
 
     return w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img
 
@@ -230,10 +226,10 @@ def exercise062_plot(w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3,
     plt.close()
 
 
-w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img = ex61(30)
+w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img = ex61(3, 30)
 exercise061_plot(w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img)
 
-w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img = ex61(8)
+w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img = ex61(50, 3)
 exercise062_plot(w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3, w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img)
 
 def compute_harris_corners(
@@ -385,9 +381,6 @@ def detect_corners(r: np.ndarray, threshold: Union[int, float] = 0.5) -> np.ndar
 
     # Find candidates where R > threshold (corner candidates)
     corners_candidates = r > threshold
-
-    # Get the coordinates of corner candidates
-    # np.where returns (row_indices, col_indices) which correspond to (y, x) or (n, m)
     corner_pos = np.argwhere(corners_candidates)
 
     return corner_pos
@@ -524,8 +517,148 @@ def import_and_convert_img(img_path: str, img_size: int = 800) -> np.ndarray:
 
 
 
-chessboard_path = "chessboard_crooked.png"  # Update with your actual path
+def detect_corners_improved(r: np.ndarray, threshold_ratio: float = 0.01, window_size: int = 5) -> np.ndarray:
+    """
+    Improved corner detection with adaptive thresholding and non-maximum suppression
+    """
+    from scipy.ndimage import maximum_filter
+
+    # Adaptive threshold based on maximum R value
+    threshold = threshold_ratio * r.max()
+
+    # Non-maximum suppression
+    local_max = maximum_filter(r, size=window_size)
+    corners = (r == local_max) & (r > threshold)
+
+    corner_pos = np.argwhere(corners)
+    return corner_pos
+
+def visualize_chessboard_harris():
+    """Create complete Harris corner detection visualization for chessboard"""
+
+    # Load and convert chessboard image
+    chessboard_path = "chessboard_crooked.png"
+    chess_img = import_and_convert_img(chessboard_path)
+
+    fm_chess, fn_chess = compute_derivatives(chess_img, sigma=3)
+
+    # Compute Harris corner response
+    mmm, mmn, mnm, mnn, det_m, tra_m, r = compute_harris_corners(fm_chess, fn_chess, k=0.04, sigma=3)
+
+    # Detect corners using improved method
+    corner_pos = detect_corners_improved(r, threshold_ratio=0.001, window_size=5)
 
 
-chess_img = import_and_convert_img(chessboard_path, img_size=800)
+    # Create the visualization (2 rows, 2 columns + text area)
+    fig = plt.figure(figsize=(14, 10))
+
+    # Row 1, Col 1: Original chessboard image
+    ax1 = plt.subplot(2, 2, 1)
+    ax1.set_title("image", fontsize=14)
+    ax1.axis("off")
+    ax1.imshow(chess_img, cmap='gray', vmin=0, vmax=255)
+
+    #  Corner response R
+    ax2 = plt.subplot(2, 2, 2)
+    ax2.set_title("corner response R", fontsize=14)
+    ax2.axis("off")
+    # Normalize R for better visualization
+    r_display = r.copy()
+    r_display[r_display < 0] = 0  # Clip negative values
+    ax2.imshow(r_display, cmap='gray')
+
+    # Determinant
+    ax3 = plt.subplot(2, 2, 3)
+    ax3.set_title("det(M)", fontsize=14)
+    ax3.axis("off")
+    det_display = det_m.copy()
+    det_display[det_display < 0] = 0  # Clip negative values
+    ax3.imshow(det_display, cmap='gray')
+
+    # Trace
+    ax4 = plt.subplot(2, 2, 4)
+    ax4.set_title("trace(M)", fontsize=14)
+    ax4.axis("off")
+    ax4.imshow(tra_m, cmap='gray')
+
+    plt.tight_layout()
+    #plt.savefig("chessboard_harris_analysis.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    #print("Harris analysis saved: chessboard_harris_analysis.png")
+
+    # Create second figure: Detected corners
+    fig2 = plt.figure(figsize=(10, 10))
+
+    ax5 = plt.subplot(1, 1, 1)
+    ax5.set_title("corners in image", fontsize=16)
+    ax5.axis("off")
+    ax5.imshow(chess_img, cmap='gray', vmin=0, vmax=255)
+
+    # Plot detected corners as red circles with black centers
+    ax5.plot(corner_pos[:, 1], corner_pos[:, 0], 'ro',
+             markersize=8, markerfacecolor='red',
+             markeredgecolor='black', markeredgewidth=1.5)
+
+    # Add text annotation
+    ax5.text(0.02, 0.98, f"{len(corner_pos)} corners found",
+             transform=ax5.transAxes, fontsize=14,
+             verticalalignment='top',
+             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+    plt.tight_layout()
+    #plt.savefig("chessboard_corners_detected.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    #print("Corner detection saved: chessboard_corners_detected.png")
+
+    # Create combined figure like in reference
+    fig_combined = plt.figure(figsize=(14, 14))
+
+    # Top row
+    ax1 = plt.subplot(3, 2, 1)
+    ax1.set_title("image", fontsize=14)
+    ax1.axis("off")
+    ax1.imshow(chess_img, cmap='gray')
+
+    ax2 = plt.subplot(3, 2, 2)
+    ax2.set_title("corner response R", fontsize=14)
+    ax2.axis("off")
+    ax2.imshow(r, cmap='gray')
+
+    # Middle row
+    ax3 = plt.subplot(3, 2, 3)
+    ax3.set_title("det(M)", fontsize=14)
+    ax3.axis("off")
+    ax3.imshow(det_m, cmap='gray')
+
+    ax4 = plt.subplot(3, 2, 4)
+    ax4.set_title("trace(M)", fontsize=14)
+    ax4.axis("off")
+    ax4.imshow(tra_m, cmap='gray')
+
+    # Bottom row - spanning both columns
+    ax5 = plt.subplot(3, 1, 3)
+    ax5.set_title("corners in image", fontsize=16)
+    ax5.axis("off")
+    ax5.imshow(chess_img, cmap='gray')
+    ax5.plot(corner_pos[:, 1], corner_pos[:, 0], 'ro',
+             markersize=6, markerfacecolor='red',
+             markeredgecolor='black', markeredgewidth=1)
+
+    # Add text annotation in the right area
+    ax5.text(1.05, 0.5, f"{len(corner_pos)} corners found",
+             transform=ax5.transAxes, fontsize=14,
+             verticalalignment='center',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    plt.savefig("chessboard_analysis.png", dpi=150, bbox_inches='tight')
+    plt.close()
+
+
+    return chess_img, r, corner_pos
+
+
+# Run the complete chessboard analysis
+chess_img, r_chess, corners_chess = visualize_chessboard_harris()
+
 
