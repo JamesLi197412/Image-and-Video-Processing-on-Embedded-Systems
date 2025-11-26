@@ -95,10 +95,12 @@ def sigma_variation(gray_img:np.ndarray):
     plt.savefig("gaussian_smoothing_comparison.png")
     plt.close()
 
+sigma_variation(gray_img)
+
 
 # Task 3: Test Gaussian derivatives with different sigma values
-def gaussian_derivatives(gray_img:np.ndarray, sigma_values:List[float]):
-    sigma_values = [1, 3, 7, 10]
+def gaussian_derivatives(gray_img:np.ndarray, sigma_values:List[int]):
+    #sigma_values = [1, 3, 7, 10]
     plt.figure(figsize=(16, 12))
     for idx, sig in enumerate(sigma_values):
         fm_deriv = ndim.gaussian_filter(gray_img, (sig, sig), (0, 1))
@@ -114,5 +116,5 @@ def gaussian_derivatives(gray_img:np.ndarray, sigma_values:List[float]):
     plt.close()
 
 
-
+gaussian_derivatives(gray_img, sigma_values)
 

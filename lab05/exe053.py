@@ -14,6 +14,7 @@ import os
 
 def sobel_filter(np_img: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     assert isinstance(np_img, np.ndarray)
+    np_img = np_img.astype(float)
     fm = ndim.sobel(np_img, axis=1)  # Horizontal edges
     fn = ndim.sobel(np_img, axis=0)  # Vertical edges
     magnitude = np.sqrt(fm**2 + fn**2)
@@ -24,6 +25,7 @@ def sobel_filter(np_img: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray
 
 def edge_detector(np_img: np.ndarray, dm: np.ndarray, dn: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     assert all(isinstance(arr, np.ndarray) for arr in (np_img, dm, dn))
+    np_img = np_img.astype(float)
     fm = ndim.correlate(np_img, dm)
     fn = ndim.correlate(np_img, dn)
 
