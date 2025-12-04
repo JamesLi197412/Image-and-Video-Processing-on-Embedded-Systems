@@ -9,7 +9,7 @@ import cv2
 from scipy.ndimage import gaussian_filter
 from typing import Union, Tuple
 
-# Visualization code for Fig. 6.7 (3D surface plots)
+# 3D surface plots
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
@@ -92,7 +92,7 @@ def ex61(dev, sigma):
 
 def exercise061_plot(w_fm1, w_fn1, img1, w_fm2, w_fn2, img2, w_fm3, w_fn3, img3,
     w_fm4, w_fn4, img4, w_fm5, w_fn5, img5, w_fm6, w_fn6, img6, img, n_img):
-    # Create figure matching Figure 6.5 layout (4 rows, 6 columns)
+    # Create figure matching
     plt.figure(figsize=(18, 12))
 
     # Row 1: Original images
@@ -270,7 +270,7 @@ fm_n, fn_n = compute_derivatives(n_img, 10)
 
 mmm, mmn, mnm, mnn,det_m, tra_m, r = compute_harris_corners(fm, fn, k=0.04, sigma=3)
 
-# Exercise 6.3 - Compute Harris corners for noisy image
+# Compute Harris corners for noisy image
 mmm, mmn, mnm, mnn,det_m_n, tra_m_n, r_n = compute_harris_corners(fm_n, fn_n, k=0.04, sigma=3)
 
 def figure067(img, det_m, tra_m, r, det_m_n, tra_m_n, r_n):
@@ -656,7 +656,6 @@ def visualize_chessboard_harris():
 
 
     return chess_img, r, corner_pos
-
 
 # Run the complete chessboard analysis
 chess_img, r_chess, corners_chess = visualize_chessboard_harris()
