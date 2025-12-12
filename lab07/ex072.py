@@ -27,11 +27,10 @@ USER_INPUT = {
 
 def get_user_settings() -> Tuple[Tuple[int, int], int]:
     frame_number = 0
-    resolution = 0
     while True:
         try:
             res_input = input(USER_INPUT["res"])
-            width_str, height_str = res_input.split(',')
+            width_str, height_str = res_input.split(' ')
             resolution: Tuple[int, int] = (int(width_str), int(height_str))
             break
         except ValueError:
@@ -97,20 +96,19 @@ def capture_sequence(resolution: Tuple[int, int],frame_count: int) -> Optional[L
                     return []
 
             # RED button → exit
-            if red_button.is_pressed() and not is_pressed:
+            if red_button.is_pressed and not is_pressed:
                 print("Capture cancelled by user.")
                 return []
 
             # GREEN button → take picture (only on state change!)
-            if green_button.is_pressed() and not is_pressed:
+            if green_button.is_pressed and not is_pressed:
                 frames.append(bg_frame[:, :, :3])
                 frames_remaining -= 1
                 print(f"Picture taken! ({frames_remaining} remaining.)")
 
             # update last state of buttons
-            is_pressed = green_button.is_pressed() or red_button.is_pressed()
+            is_pressed = green_button.is_pressed or red_button.is_pressed
 
-            return frames
 
     except Exception as e:
         print(f"{INFO['cam_err']} {e}")
@@ -120,6 +118,7 @@ def capture_sequence(resolution: Tuple[int, int],frame_count: int) -> Optional[L
         cv2.destroyAllWindows()
         print(INFO["exit_ok"])
 
+    return frames
 
 def interface():
     print(INFO["start"])

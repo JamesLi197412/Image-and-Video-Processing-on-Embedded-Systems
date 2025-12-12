@@ -13,6 +13,8 @@ def draw_matches(img1: np.ndarray,
     h2, w2 = img2.shape[:2]
 
     matches_img = np.zeros((max(h1, h2), w1 + w2, 3), dtype=np.uint8)
+
+
     matches_img[:h1, :w1] = img1 if len(img1.shape) == 3 else cv2.cvtColor(img1, cv2.COLOR_GRAY2BGR)
     matches_img[:h2, w1:w1 + w2] = img2 if len(img2.shape) == 3 else cv2.cvtColor(img2, cv2.COLOR_GRAY2BGR)
 
