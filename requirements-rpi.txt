@@ -1,0 +1,12 @@
+# Raspberry Pi overlay dependencies.
+# Install with: pip install -r requirements-rpi.txt
+-r requirements.txt
+
+gpiozero==2.0.1
+
+# Picamera2 depends on the Raspberry Pi libcamera stack.
+# Recommended on Raspberry Pi OS:
+#   sudo apt update
+#   sudo apt install -y python3-picamera2 python3-libcamera
+# If you prefer pip and have the required system stack installed, uncomment:
+# picamera2

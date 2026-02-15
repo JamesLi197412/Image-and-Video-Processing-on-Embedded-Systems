@@ -2,7 +2,7 @@ from numpy import interp, histogram
 from PIL import Image
 
 def histeq(im, nbr_bins=256):
-    imhist, bins = histogram(im.flatten(), nbr_bins, normed = True)
+    imhist, bins = histogram(im.flatten(), nbr_bins, density=True)
     cdf = imhist.cumsum()   # cumulative distribution function
     cdf = 255 * cdf / cdf[-1] # normalize
 

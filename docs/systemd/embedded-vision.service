@@ -1,0 +1,25 @@
+[Unit]
+Description=Embedded Vision Background Replacement Pipeline
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/pythonlab/lab09
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/pythonlab/.venv/bin/python -m lab09.main \
+  --source camera \
+  --foreground-video /home/pi/pythonlab/lab09/fg.mp4 \
+  --background-video /home/pi/pythonlab/lab09/bg.mp4 \
+  --cascade /home/pi/pythonlab/lab09/haarcascade_frontalface_default.xml \
+  --output /home/pi/pythonlab/lab09/out.mp4 \
+  --metrics-csv /home/pi/pythonlab/lab09/metrics/lab09_main_metrics.csv
+Restart=on-failure
+RestartSec=3
+
+# Helpful when camera files are created dynamically on boot
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

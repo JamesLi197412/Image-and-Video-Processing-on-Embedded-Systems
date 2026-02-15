@@ -1,143 +1,178 @@
-import cv2
-import select
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
 import sys
 import time
-from gpiozero import Button
-from picamera2 import Picamera2
+from typing import List, Optional, Tuple
+
+import cv2
 import numpy as np
-from typing import List, Tuple, Optional
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from embedded_utils import RuntimeMetricsLogger, open_video_source, parse_resolution
 
 INFO = {
-    "start": "Starting panorama program.",
-    "init": "Initializing camera and buttons...",
+    "start": "Starting panorama capture program.",
+    "init": "Initializing video source...",
     "init_ok": "Initialization succeeded.",
-    "init_fail": "A critical error occurred. Restarting session...",
+    "init_fail": "A critical error occurred.",
     "settings_ok": "Settings confirmed. Starting capture session.",
-    "cam_error": "A camera error occurred. Restarting session...",
-    "exit_ok": "Camera closed successfully!",
-    "take_img": "Press the GREEN button to take a picture. Press RED or 'q' to exit.",
-    "res_fail": "Invalid resolution format. Please use 'width,height' (e.g., 1920,1080).",
-    "frame_count_fail": "Invalid number. Defaulting to 4 frames.",
+    "exit_ok": "Capture session closed.",
 }
 
-USER_INPUT = {
-    "res": "Enter resolution as 'width,height': ",
-    "frame_count": "How many frames to capture (max 6)? ",
-}
 
-def get_user_settings() -> Tuple[Tuple[int, int], int]:
-    frame_number = 0
-    while True:
-        try:
-            res_input = input(USER_INPUT["res"])
-            width_str, height_str = res_input.split(' ')
-            resolution: Tuple[int, int] = (int(width_str), int(height_str))
-            break
-        except ValueError:
-            print(INFO["res_fail"])
-
-    while True:
-        try:
-            frame_number = int(input(USER_INPUT["frame_count"]))
-            if not 0 < frame_number <= 6:
-                raise ValueError
-            break
-        except (ValueError, TypeError):
-            frame_number = 4
-            print(INFO["frame_count_fail"])
-
-    print(INFO["settings_ok"])
-    return resolution, frame_number
-
-def capture_sequence(resolution: Tuple[int, int],frame_count: int) -> Optional[List[np.ndarray]]:
+def capture_sequence(
+    resolution: Tuple[int, int],
+    frame_count: int,
+    source: str = "auto",
+    camera_index: int = 0,
+    video_path: str = "",
+    show_window: bool = True,
+    metrics_csv: str = "metrics/lab07_ex072_metrics.csv",
+) -> Optional[List[np.ndarray]]:
     print(INFO["init"])
-    frames = []
 
-    # initialisation
-    try:
-        with Picamera2() as picam2:
-            config = picam2.create_preview_configuration(
-                main={"format": "XRGB8888", "size": resolution}
-            )
-            picam2.configure(config)
-
-            green_button = Button(5)
-            red_button = Button(6)
-
-            picam2.start()
-            print(INFO["init_ok"])
-
-            cv2.namedWindow("panorama", cv2.WINDOW_NORMAL)
-            cv2.setWindowProperty(
-                "panorama", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN
-            )
-
-            time.sleep(1)
-    except Exception as e:
-        print(f"\nError: {e}")
-        return None
-
-    is_pressed = False
-    frames_remaining = frame_count
+    prefer_camera = source in {"camera", "auto"}
+    fallback_video = video_path if source in {"auto", "camera", "video"} else None
 
     try:
-        while frames_remaining > 0:
-            bg_frame = picam2.capture_array()
-            cv2.imshow("panorama", bg_frame)
-
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                print("Capture cancelled by user.")
-                return []
-
-            # If user presses q in terminal
-            if select.select([sys.stdin], [], [], 0)[0]:
-                if sys.stdin.readline().strip().lower() == "q":
-                    print("Capture cancelled by user.")
-                    return []
-
-            # RED button → exit
-            if red_button.is_pressed and not is_pressed:
-                print("Capture cancelled by user.")
-                return []
-
-            # GREEN button → take picture (only on state change!)
-            if green_button.is_pressed and not is_pressed:
-                frames.append(bg_frame[:, :, :3])
-                frames_remaining -= 1
-                print(f"Picture taken! ({frames_remaining} remaining.)")
-
-            # update last state of buttons
-            is_pressed = green_button.is_pressed or red_button.is_pressed
-
-
-    except Exception as e:
-        print(f"{INFO['cam_err']} {e}")
+        cap, source_label, msg = open_video_source(
+            camera_index=camera_index,
+            fallback_video=fallback_video,
+            resolution=resolution,
+            prefer_camera=prefer_camera,
+        )
+        print(msg)
+        print(INFO["init_ok"])
+    except Exception as exc:
+        print(f"{INFO['init_fail']} {exc}")
         return None
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps is None or fps <= 1e-6:
+        fps = 10.0
+    metrics = RuntimeMetricsLogger(metrics_csv, source=f"lab07_ex072:{source_label}", target_fps=fps)
+
+    frames: List[np.ndarray] = []
+    frame_index = 0
+
+    try:
+        while len(frames) < frame_count:
+            started = metrics.begin_frame()
+            ret, frame = cap.read()
+            if not ret:
+                metrics.log_frame(frame_index, started, note="stream_end", dropped_frames=1)
+                break
+
+            if show_window:
+                preview = frame.copy()
+                cv2.putText(
+                    preview,
+                    f"Captured {len(frames)}/{frame_count} | SPACE=capture | q=quit",
+                    (10, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0),
+                    2,
+                )
+                cv2.imshow("panorama", preview)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q"):
+                    metrics.log_frame(frame_index, started, note="user_exit")
+                    return frames
+                if key == ord(" "):
+                    frames.append(frame[:, :, :3].copy())
+                    print(f"Picture taken! ({frame_count - len(frames)} remaining.)")
+                    metrics.log_frame(frame_index, started, note="captured")
+                else:
+                    metrics.log_frame(frame_index, started, note="preview")
+            else:
+                # Headless mode: capture at 1 frame per second.
+                frames.append(frame[:, :, :3].copy())
+                metrics.log_frame(frame_index, started, note="captured_headless")
+                time.sleep(1.0)
+
+            frame_index += 1
     finally:
+        cap.release()
         cv2.destroyAllWindows()
         print(INFO["exit_ok"])
 
     return frames
 
-def interface():
+
+def interface(
+    resolution: Tuple[int, int] | None = None,
+    frame_number: int | None = None,
+    source: str = "auto",
+    camera_index: int = 0,
+    video_path: str = "",
+    show_window: bool = True,
+    metrics_csv: str = "metrics/lab07_ex072_metrics.csv",
+):
     print(INFO["start"])
-    print(INFO["init"])
+    if resolution is None:
+        resolution = (640, 480)
+    if frame_number is None:
+        frame_number = 4
 
-    resolution, frame_number = get_user_settings()
-    while True:
+    print(INFO["settings_ok"])
+    captured_frames = capture_sequence(
+        resolution=resolution,
+        frame_count=frame_number,
+        source=source,
+        camera_index=camera_index,
+        video_path=video_path,
+        show_window=show_window,
+        metrics_csv=metrics_csv,
+    )
 
-        captured_frames = capture_sequence(resolution, frame_number)
+    if captured_frames is None:
+        return None
 
-        if captured_frames is None:
-            time.sleep(2)
-            continue
+    if captured_frames:
+        print(f"Successfully captured {len(captured_frames)} frames.")
+    else:
+        print("Capture cancelled by user.")
 
-        if captured_frames:
-            print(f"\nSuccessfully captured {len(captured_frames)}Exiting.")
-        else:
-            print(f"\nSuccessfully captured cancelled by user. Exiting.")
-        break
+    return captured_frames
 
-if __name__ == '__main__':
-    interface()
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Capture panorama frames with fallback and metrics.")
+    parser.add_argument("--resolution", default="640,480", help="Capture resolution as W,H.")
+    parser.add_argument("--frame-count", type=int, default=4, help="Number of frames to capture.")
+    parser.add_argument("--source", choices=["auto", "camera", "video"], default="auto")
+    parser.add_argument("--camera-index", type=int, default=0)
+    parser.add_argument("--video", default="", help="Fallback or explicit video path.")
+    parser.add_argument("--metrics-csv", default="metrics/lab07_ex072_metrics.csv")
+    parser.add_argument("--no-window", action="store_true", help="Headless auto-capture mode.")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        resolution = parse_resolution(args.resolution)
+    except Exception as exc:
+        print(f"Error: invalid resolution - {exc}")
+        return 1
+
+    frames = interface(
+        resolution=resolution,
+        frame_number=max(1, args.frame_count),
+        source=args.source,
+        camera_index=args.camera_index,
+        video_path=args.video,
+        show_window=not args.no_window,
+        metrics_csv=args.metrics_csv,
+    )
+    return 0 if frames is not None else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

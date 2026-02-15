@@ -1,0 +1,8 @@
+# Core dependencies for labs that can run on most machines.
+# Install with: pip install -r requirements.txt
+numpy==1.26.4
+pillow==10.4.0
+matplotlib==3.8.4
+scipy==1.11.4
+opencv-python==4.10.0.84
+psutil==5.9.8

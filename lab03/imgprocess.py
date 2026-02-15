@@ -6,7 +6,7 @@ import time
 
 # Global variables
 BLACK = (0,0,0)
-WHITE = (256,256,256)
+WHITE = (255,255,255)
 CHESS_SIZE = [8,8]
 FIELD_SIZE = [5,5]
 WIDTH = CHESS_SIZE[0] * FIELD_SIZE[0]
@@ -71,7 +71,7 @@ def transpose_pic(pic: PILImage) -> PILImage:
     for x in range(width):
         for y in range(height):
             color = pic.getpixel((x, y))
-            rotated_pic.putpixel((x, y), color)
+            rotated_pic.putpixel((y, x), color)
     return rotated_pic
 
 
@@ -129,17 +129,19 @@ def check_time(time_in_sec: float) -> float:
 
 def measure_efficiency():
     print("Measuring create_chessboard_2()")
-    elpased_time_2 = check_time(0)
-    chessboard_2 = create_chessboard_2()
-    print(f"create_chessboard_2 took :{elpased_time_2:.06}")
+    start_2 = time.perf_counter()
+    create_chessboard_2()
+    elapsed_time_2 = time.perf_counter() - start_2
+    print(f"create_chessboard_2 took: {elapsed_time_2:.6f} seconds")
 
     # Measure the time for create_chessboard_3 (using point method)
     print("\nMeasuring create_chessboard_3...")
-    elapsed_time_3 = check_time(0)  # No sleep, measure immediately
-    chessboard_3 = create_chessboard_3()
+    start_3 = time.perf_counter()
+    create_chessboard_3()
+    elapsed_time_3 = time.perf_counter() - start_3
     print(f"create_chessboard_3 took: {elapsed_time_3:.6f} seconds")
 
     # Compare the results
     print(f"\nSpeed comparison:")
-    print(f"create_chessboard_2: {elpased_time_2:.6f} seconds")
+    print(f"create_chessboard_2: {elapsed_time_2:.6f} seconds")
     print(f"create_chessboard_3: {elapsed_time_3:.6f} seconds")

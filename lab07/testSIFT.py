@@ -1,22 +1,39 @@
+from __future__ import annotations
+
+import argparse
+
 import cv2
-import numpy as np
 
-FEATURES = 400
-MASK = None
 
-img = cv2.imread('mandrill.png', 0)
-if img is None:
-    print("Error: Could not load image 'mandrill.png'. Check file path.")
-    exit()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Quick SIFT feature detection test.")
+    parser.add_argument("--input", default="mandrill.png", help="Input image path.")
+    parser.add_argument("--features", type=int, default=400, help="SIFT max features.")
+    parser.add_argument("--output", default="mandrillKP.png", help="Output image path for keypoint visualization.")
+    return parser.parse_args()
 
-sift = cv2.SIFT_create(FEATURES)  # SIFT detector object
-kp, des = sift.detectAndCompute(img, MASK)  # detect keypoints & compute descriptors
 
-# Print the number of features found (length of the feature vector des)
-print(f"Number of SIFT features detected: {len(kp)}")
-print(f"Length of feature descriptor vector (des): {len(des)}")
+def main() -> int:
+    args = parse_args()
+    img = cv2.imread(args.input, 0)
+    if img is None:
+        print(f"Error: Could not load image: {args.input}")
+        return 1
 
-feat_img = cv2.drawKeypoints(img, kp, None, (0, 0, 255), 4)  # keypoints on image.
+    sift = cv2.SIFT_create(args.features)
+    kp, des = sift.detectAndCompute(img, None)
 
-cv2.imwrite("mandrillKP.png", feat_img)
+    print(f"Number of SIFT keypoints detected: {len(kp)}")
+    if des is not None:
+        print(f"Descriptor matrix shape: {des.shape}")
+    else:
+        print("Descriptor matrix is None")
 
+    feat_img = cv2.drawKeypoints(img, kp, None, (0, 0, 255), 4)
+    cv2.imwrite(args.output, feat_img)
+    print(f"Saved: {args.output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

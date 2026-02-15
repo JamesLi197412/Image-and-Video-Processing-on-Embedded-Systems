@@ -1,88 +1,132 @@
-import cv2
-from gpiozero import Button
-from picamera2 import Picamera2
-import select
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
 import sys
-import time
-import itertools
-import os
 
-red_button = Button(6)
+import cv2
 
-pencasc_vert = cv2.CascadeClassifier("pen_vertical.xml")
-pencasc_hor  = cv2.CascadeClassifier("pen_horizontal.xml")
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-# Use recorded video
-video_capture = cv2.VideoCapture("my_video.avi")
-# video_capture = None   # use this for live camera
+from embedded_utils import RuntimeMetricsLogger
+from embedded_utils import open_video_source
 
-os.makedirs("output", exist_ok=True)
-frame_id = 0
+try:
+    from ex083 import _load_cascades
+except ImportError:
+    from lab08.ex083 import _load_cascades
 
-with Picamera2() as picam2:
-    config = picam2.create_preview_configuration(
-        main={"format": "XRGB8888", "size": (640, 480)}
+
+def run_detection_and_export(
+    source: str,
+    camera_index: int,
+    video_path: str,
+    vertical_cascade: str,
+    horizontal_cascade: str,
+    output_dir: str,
+    metrics_csv: str,
+    scale_factor: float,
+    min_neighbors: int,
+    show_window: bool,
+) -> int:
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    prefer_camera = source in {"camera", "auto"}
+    fallback_video = video_path if source in {"auto", "video", "camera"} else None
+
+    cap, source_label, msg = open_video_source(
+        camera_index=camera_index,
+        fallback_video=fallback_video,
+        resolution=None,
+        prefer_camera=prefer_camera,
     )
+    print(msg)
 
-    if video_capture is None:
-        picam2.configure(config)
-        picam2.start()
+    cascades = _load_cascades(vertical_cascade, horizontal_cascade)
 
-    cv2.namedWindow("window", cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    time.sleep(1)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps is None or fps <= 1e-6:
+        fps = 10.0
+    metrics = RuntimeMetricsLogger(metrics_csv, source=f"lab08_ex084:{source_label}", target_fps=fps)
 
+    frame_id = 0
     while True:
-        if video_capture is None:
-            bgr_frame = picam2.capture_array()
-            gray = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2GRAY)
-        else:
-            ret, bgr_frame = video_capture.read()
-            if not ret:
-                break
-            gray = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2GRAY)
-
-        pens_vert = pencasc_vert.detectMultiScale(
-            gray,
-            scaleFactor=1.7,
-            minNeighbors=25,
-            minSize=(25, 80),
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
-
-        pens_hor = pencasc_hor.detectMultiScale(
-            gray,
-            scaleFactor=1.8,
-            minNeighbors=30,
-            minSize=(80, 35),
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
-
-        for x, y, w, h in itertools.chain(pens_vert, pens_hor):
-            cv2.rectangle(
-                bgr_frame,
-                (x, y),
-                (x + w, y + h),
-                (0, 255, 0),
-                2
-            )
-
-        if len(pens_hor) > 0 or len(pens_vert) > 0:
-            cv2.imwrite(f"output/frame_{frame_id:05d}.png", bgr_frame)
-            frame_id += 1
-
-        cv2.imshow("window", bgr_frame)
-
-        if (cv2.waitKey(1) & 0xFF) == ord("q") or red_button.is_pressed:
+        start = metrics.begin_frame()
+        ret, frame = cap.read()
+        if not ret:
+            metrics.log_frame(frame_id, start, note="stream_end", dropped_frames=1)
             break
 
-        if select.select([sys.stdin], [], [], 0)[0]:
-            if sys.stdin.readline().strip().lower() == "q":
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        total_detections = 0
+        for cascade in cascades:
+            detections = cascade.detectMultiScale(
+                gray,
+                scaleFactor=scale_factor,
+                minNeighbors=min_neighbors,
+                minSize=(25, 25),
+                flags=cv2.CASCADE_SCALE_IMAGE,
+            )
+            for x, y, w, h in detections:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                total_detections += 1
+
+        if total_detections > 0:
+            cv2.imwrite(str(out_dir / f"frame_{frame_id:05d}.png"), frame)
+
+        if show_window:
+            cv2.imshow("window", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                metrics.log_frame(frame_id, start, note="user_exit")
                 break
 
-        time.sleep(1 / 10)
+        metrics.log_frame(frame_id, start, note=f"detections={total_detections}")
+        frame_id += 1
 
-    if video_capture is None:
-        picam2.stop()
+    cap.release()
+    cv2.destroyAllWindows()
+    print(f"Detection frames saved to: {out_dir.resolve()}")
+    return 0
 
-cv2.destroyAllWindows()
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Exercise 8.4 detection + frame export with fallback and metrics.")
+    parser.add_argument("--source", choices=["auto", "camera", "video"], default="video")
+    parser.add_argument("--camera-index", type=int, default=0)
+    parser.add_argument("--video", default="my_video.avi")
+    parser.add_argument("--vertical-cascade", default="pen_vertical.xml")
+    parser.add_argument("--horizontal-cascade", default="pen_horizontal.xml")
+    parser.add_argument("--scale-factor", type=float, default=1.7)
+    parser.add_argument("--min-neighbors", type=int, default=25)
+    parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--metrics-csv", default="metrics/lab08_ex084_metrics.csv")
+    parser.add_argument("--no-window", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        return run_detection_and_export(
+            source=args.source,
+            camera_index=args.camera_index,
+            video_path=args.video,
+            vertical_cascade=args.vertical_cascade,
+            horizontal_cascade=args.horizontal_cascade,
+            output_dir=args.output_dir,
+            metrics_csv=args.metrics_csv,
+            scale_factor=args.scale_factor,
+            min_neighbors=args.min_neighbors,
+            show_window=not args.no_window,
+        )
+    except Exception as exc:
+        print(f"Error: {exc}")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

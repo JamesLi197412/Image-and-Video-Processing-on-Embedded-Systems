@@ -1,12 +1,18 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Tuple
+
 from PIL import Image
 from PIL.Image import Image as PILImage
-from typing import List
 
-#exercise 4.2
-# The conclusion: You are strongly not suggested to work on pixel by pixel, it will take too longer time.
+
+# exercise 4.2
+# The conclusion: pixel-by-pixel loops are simple but slower than vectorized approaches.
 def convert_to_grayscale_simple(img: PILImage) -> PILImage:
     width, height = img.size
-    gray_img = Image.new('L', (width, height))
+    gray_img = Image.new("L", (width, height))
 
     for y in range(height):
         for x in range(width):
@@ -18,7 +24,7 @@ def convert_to_grayscale_simple(img: PILImage) -> PILImage:
 
 def convert_to_grayscale_weighted(img: PILImage) -> PILImage:
     width, height = img.size
-    gray_img = Image.new('L', (width, height))
+    gray_img = Image.new("L", (width, height))
 
     for y in range(height):
         for x in range(width):
@@ -29,22 +35,56 @@ def convert_to_grayscale_weighted(img: PILImage) -> PILImage:
     return gray_img
 
 
-def histogram(img_gray: PILImage) -> List[int]:
-    width, height = img_gray.size
-    pixel_values = []
+def _load_rgb_image(image_path: Path) -> PILImage:
+    if not image_path.exists():
+        raise FileNotFoundError(f"Input image not found: {image_path}")
+    img = Image.open(image_path)
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+    elif img.mode == "RGBA":
+        img = img.convert("RGB")
+    return img
 
-    for y in range(height):
-        for x in range(width):
-            pixel_values.append(img_gray.getpixel((x, y)))
 
-    return pixel_values
+def process_image(image_path: Path, output_dir: Path) -> Tuple[Path, Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    img = _load_rgb_image(image_path)
 
-def image_process(filename:str):
-    img = Image.open( filename +".png")
     gray_simple = convert_to_grayscale_simple(img)
     gray_weighted = convert_to_grayscale_weighted(img)
 
-    gray_simple.save(f"{filename}_simple.png")
-    gray_weighted.save(f"{filename}_weighted.png")
+    stem = image_path.stem
+    simple_path = output_dir / f"{stem}_simple.png"
+    weighted_path = output_dir / f"{stem}_weighted.png"
 
-image_process("mandrill")
+    gray_simple.save(simple_path)
+    gray_weighted.save(weighted_path)
+
+    return simple_path, weighted_path
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Convert an image to grayscale (simple + weighted).")
+    parser.add_argument("--input", default="mandrill.png", help="Path to input image.")
+    parser.add_argument("--output-dir", default=".", help="Directory for generated outputs.")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    input_path = Path(args.input)
+    output_dir = Path(args.output_dir)
+
+    try:
+        simple_path, weighted_path = process_image(input_path, output_dir)
+    except Exception as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    print(f"Saved simple grayscale image: {simple_path}")
+    print(f"Saved weighted grayscale image: {weighted_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import argparse
 from typing import List, Tuple, Optional
 
 def draw_matches(img1: np.ndarray,
@@ -43,43 +44,61 @@ def draw_matches(img1: np.ndarray,
 FEATURES = 400
 MASK = None
 
-img1 = cv2.imread('Img1.png')  # Query image
-img2 = cv2.imread('Img2.png')  # Train image
-
-gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY) if len(img1.shape) == 3 else img1
-gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY) if len(img2.shape) == 3 else img2
-
-sift = cv2.SIFT_create(FEATURES)
-kp1, des1 = sift.detectAndCompute(gray1, MASK)
-kp2, des2 = sift.detectAndCompute(gray2, MASK)
-
-bf = cv2.BFMatcher(cv2.NORM_L2)
-
-matches = bf.knnMatch(des1, des2, k=2)
-
-good_matches = []
-NNDR_RATIO = 0.75
-
-for match_pair in matches:
-    if len(match_pair) == 2:
-        m, n = match_pair  # m is best match, n is second best
-        if m.distance < NNDR_RATIO * n.distance:
-            good_matches.append(m)
-
-print(f"Good matches with Brute-Force found: {len(good_matches)}")
-
-feat_img_a = cv2.drawKeypoints(img1, kp1, None, (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-feat_img_b = cv2.drawKeypoints(img2, kp2, None, (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-cv2.imwrite('featImg1.png', feat_img_a)
-cv2.imwrite('featImg2.png', feat_img_b)
-
-result_matches = draw_matches(img1, kp1, img2, kp2, good_matches)
-cv2.imwrite('matches.png', result_matches)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="SIFT matching visualization for two images.")
+    parser.add_argument("--img1", default="Img1.png", help="Path to first image.")
+    parser.add_argument("--img2", default="Img2.png", help="Path to second image.")
+    parser.add_argument("--features", type=int, default=400, help="SIFT max features.")
+    parser.add_argument("--nndr", type=float, default=0.75, help="NNDR ratio threshold.")
+    parser.add_argument("--out-kp1", default="featImg1.png", help="Output path for image 1 keypoints.")
+    parser.add_argument("--out-kp2", default="featImg2.png", help="Output path for image 2 keypoints.")
+    parser.add_argument("--out-matches", default="matches.png", help="Output path for match visualization.")
+    return parser.parse_args()
 
 
-print(f"NNDR ratio used: {NNDR_RATIO}")
-print(f"Number of good correspondences: {len(good_matches)}")
+def main() -> int:
+    args = parse_args()
+    img1 = cv2.imread(args.img1)  # Query image
+    img2 = cv2.imread(args.img2)  # Train image
+    if img1 is None or img2 is None:
+        raise RuntimeError(f"Could not load input images: {args.img1}, {args.img2}")
+
+    gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY) if len(img1.shape) == 3 else img1
+    gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY) if len(img2.shape) == 3 else img2
+
+    sift = cv2.SIFT_create(args.features)
+    kp1, des1 = sift.detectAndCompute(gray1, MASK)
+    kp2, des2 = sift.detectAndCompute(gray2, MASK)
+
+    bf = cv2.BFMatcher(cv2.NORM_L2)
+
+    matches = bf.knnMatch(des1, des2, k=2)
+
+    good_matches = []
+    nndr_ratio = args.nndr
+
+    for match_pair in matches:
+        if len(match_pair) == 2:
+            m, n = match_pair  # m is best match, n is second best
+            if m.distance < nndr_ratio * n.distance:
+                good_matches.append(m)
+
+    print(f"Good matches with Brute-Force found: {len(good_matches)}")
+
+    feat_img_a = cv2.drawKeypoints(img1, kp1, None, (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    feat_img_b = cv2.drawKeypoints(img2, kp2, None, (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    cv2.imwrite(args.out_kp1, feat_img_a)
+    cv2.imwrite(args.out_kp2, feat_img_b)
+
+    result_matches = draw_matches(img1, kp1, img2, kp2, good_matches)
+    cv2.imwrite(args.out_matches, result_matches)
 
 
+    print(f"NNDR ratio used: {nndr_ratio}")
+    print(f"Number of good correspondences: {len(good_matches)}")
+    return 0
 
+
+if __name__ == "__main__":
+    raise SystemExit(main())
