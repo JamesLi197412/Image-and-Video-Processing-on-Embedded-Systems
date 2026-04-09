@@ -18,7 +18,7 @@ These map naturally to the existing labs:
 
 ## Why This Strengthens The Project Narrative
 
-You still get practice with the parts of embedded work that matter on real projects:
+Get practice with the parts of embedded work that matter on real projects:
 
 - pointer arithmetic and image memory layout
 - simple APIs with explicit status codes
@@ -44,6 +44,20 @@ The default build creates a static library in `csrc/build/`. The `shared` target
 
 The repo now includes that bridge in `embedded_utils/native_image_ops.py`, plus a benchmark harness in `benchmarks/benchmark_native_vs_python.py`.
 
-## Suggested Next Step
 
-After this foundation, the best follow-up is to benchmark the same bridge on Raspberry Pi hardware and compare host-side versus on-device behavior. That turns the repo from "I wrote some C too" into "I measure where native optimization actually pays off."
+The flow in this project is:
+
+The C code lives in image_ops.c and exposes functions declared in image_ops.h (line 19).
+The shared library is built by the shared target in Makefile (line 31), which produces libimage_ops.dylib on macOS or .so on Linux.
+Python loads that library in native_image_ops.py (line 150) using ctypes.CDLL(...).
+The same file sets the C function signatures in _configure_prototypes(...) (line 86), so Python knows the argument and return types.
+Wrapper functions like sobel_gray_u8(...) (line 222), laplace_gray_u8(...) (line 245), harris_response_gray_u8(...) (line 262), and alpha_blend_bgra_over_bgr(...) (line 280) convert NumPy arrays into contiguous buffers and pass raw pointers into C with .ctypes.data_as(...).
+In the lab code, you opt into the native path like this:
+
+sobel_filter(..., backend="c") (line 52)
+laplace_filter(..., backend="c") (line 158)
+paste_image(..., backend="c") (line 5)
+compute_harris_response_native(...) (line 28)
+So the real optimization path is:
+
+Python/NumPy image -> ctypes wrapper -> compiled C shared library -> result back to NumPy
