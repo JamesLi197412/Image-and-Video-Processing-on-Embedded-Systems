@@ -6,3 +6,6 @@ matplotlib==3.8.4
 scipy==1.11.4
 opencv-python==4.10.0.84
 psutil==5.9.8
+
+-r requirements-rpi.txt
+pytest==8.3.4
