@@ -32,6 +32,19 @@ def compute_derivatives(img: np.ndarray, sigma: Union[int, float] = 3) -> Tuple[
     return fm, fn
 
 
+def compute_harris_response_native(img: np.ndarray, k: Union[int, float] = 0.04) -> np.ndarray:
+    # The native path uses a compact Sobel + 3x3 box-window Harris response so we
+    # can benchmark a portable C implementation from Python without hardware.
+    from embedded_utils.native_image_ops import harris_response_gray_u8
+
+    gray = np.asarray(img)
+    if gray.ndim != 2:
+        raise ValueError("compute_harris_response_native expects a grayscale image.")
+    if gray.dtype != np.uint8:
+        gray = np.clip(gray, 0, 255).astype(np.uint8)
+    return harris_response_gray_u8(gray, k=float(k))
+
+
 def window_img(
     img_window: Tuple[int, int, int, int],
     img: np.ndarray,

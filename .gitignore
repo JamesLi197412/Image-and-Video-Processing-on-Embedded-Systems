@@ -41,6 +41,8 @@ output/
 *.dll
 *.exe
 *.out
+*.dSYM/
+csrc/build/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt

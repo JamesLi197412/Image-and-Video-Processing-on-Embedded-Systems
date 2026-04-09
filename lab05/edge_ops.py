@@ -22,6 +22,15 @@ def load_gray_image(path: str) -> Array:
     return np.array(Image.open(img_path).convert("L"), dtype=np.uint8)
 
 
+def _prepare_gray_u8(np_img: Array) -> Array:
+    gray = np.asarray(np_img)
+    if gray.ndim != 2:
+        raise ValueError("Expected a grayscale image with shape (H, W).")
+    if gray.dtype != np.uint8:
+        gray = np.clip(gray, 0, 255).astype(np.uint8)
+    return gray
+
+
 def edge_detector_1d(np_img: Array, dm: Array, dn: Array) -> Tuple[Array, Array, Array, Array]:
     np_img = np_img.astype(float)
     fm = ndim.correlate1d(np_img, dm, axis=1)
@@ -40,7 +49,16 @@ def edge_detector_2d(np_img: Array, dm: Array, dn: Array) -> Tuple[Array, Array,
     return fm, fn, magnitude, phase
 
 
-def sobel_filter(np_img: Array) -> Tuple[Array, Array, Array, Array]:
+def sobel_filter(np_img: Array, backend: str = "python") -> Tuple[Array, Array, Array, Array]:
+    if backend == "c":
+        from embedded_utils.native_image_ops import sobel_gray_u8
+
+        fm, fn, magnitude = sobel_gray_u8(_prepare_gray_u8(np_img))
+        phase = np.arctan2(fm, fn)
+        return fm, fn, magnitude, phase
+    if backend != "python":
+        raise ValueError(f"Unsupported backend: {backend}")
+
     np_img = np_img.astype(float)
     fm = ndim.sobel(np_img, axis=1)
     fn = ndim.sobel(np_img, axis=0)
@@ -137,8 +155,15 @@ def gauss_filter(np_img: Array, sigma: float) -> Tuple[Array, Array]:
     return fm, fn
 
 
-def laplace_filter(np_img: Array) -> Array:
-    return ndim.laplace(np_img)
+def laplace_filter(np_img: Array, backend: str = "python") -> Array:
+    if backend == "c":
+        from embedded_utils.native_image_ops import laplace_gray_u8
+
+        return laplace_gray_u8(_prepare_gray_u8(np_img))
+    if backend != "python":
+        raise ValueError(f"Unsupported backend: {backend}")
+
+    return ndim.laplace(np_img.astype(float))
 
 
 def laplace_gauss_filter(np_img: Array, sigma: float) -> Array:
